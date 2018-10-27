@@ -28,6 +28,19 @@ type Msg
     | LoadPhotos (Result Http.Error String)
 
 
+viewOnError : Model -> Html Msg
+viewOnError model =
+    case model.loadingError of
+        Nothing ->
+            view model
+
+        Just errorMessage ->
+            div [ class "error-message" ]
+                [ h1 [] [ text "Photo Groove" ]
+                , p [] [ text errorMessage ]
+                ]
+
+
 view : Model -> Html Msg
 view model =
     div [ class "content" ]
@@ -152,7 +165,11 @@ update msg model =
             )
 
         LoadPhotos (Err _) ->
-            ( model, Cmd.none )
+            ( { model
+                | loadingError = Just "Error! (Try turing it off and on again?)"
+              }
+            , Cmd.none
+            )
 
 
 initialCmd : Cmd Msg
@@ -166,7 +183,7 @@ main : Program () Model Msg
 main =
     Browser.element
         { init = \flags -> ( initialModel, initialCmd )
-        , view = view
+        , view = viewOnError
         , update = update
         , subscriptions = \_ -> Sub.none
         }
