@@ -3,9 +3,10 @@ module PhotoGroove exposing (main)
 import Array exposing (Array)
 import Browser
 import Html exposing (..)
-import Html.Attributes exposing (..)
+import Html.Attributes exposing (class, classList, id, name, src, title, type_)
 import Html.Events exposing (onClick)
 import Http
+import Json.Decode exposing (Decoder, field, int, list, map2, string)
 import Random
 
 
@@ -25,7 +26,7 @@ type Msg
     | ClickedSize ThumbnailSize
     | ClickedSurpriseMe
     | GotSelectedIndex Int
-    | LoadPhotos (Result Http.Error String)
+    | LoadPhotos (Result Http.Error (List Photo))
 
 
 viewOnError : Model -> Html Msg
@@ -73,6 +74,7 @@ viewThumbnail : Maybe String -> Photo -> Html Msg
 viewThumbnail selectedUrl thumbnail =
     img
         [ src (urlPrefix ++ thumbnail.url)
+        , title (" [" ++ String.fromInt thumbnail.size ++ " KB]")
         , classList [ ( "selected", selectedUrl == Just thumbnail.url ) ]
         , onClick (ClickedPhoto thumbnail.url)
         ]
@@ -101,7 +103,9 @@ sizeToString size =
 
 
 type alias Photo =
-    { url : String }
+    { url : String
+    , size : Int
+    }
 
 
 type alias Model =
@@ -149,24 +153,45 @@ update msg model =
             in
             ( { model | selectedUrl = newSelectedUrl }, Cmd.none )
 
-        LoadPhotos (Ok responseStr) ->
-            let
-                urls =
-                    String.split "," responseStr
-
-                photos =
-                    List.map Photo urls
-            in
+        LoadPhotos (Ok photos) ->
             ( { model
                 | photos = photos
-                , selectedUrl = List.head urls
+                , selectedUrl = Maybe.map .url (List.head photos)
               }
             , Cmd.none
             )
 
-        LoadPhotos (Err _) ->
+        LoadPhotos (Err (Http.BadUrl urlErr)) ->
             ( { model
-                | loadingError = Just "Error! (Try turing it off and on again?)"
+                | loadingError = Just ("BadUrl Error! " ++ urlErr)
+              }
+            , Cmd.none
+            )
+
+        LoadPhotos (Err Http.Timeout) ->
+            ( { model
+                | loadingError = Just "Timeout Error!"
+              }
+            , Cmd.none
+            )
+
+        LoadPhotos (Err Http.NetworkError) ->
+            ( { model
+                | loadingError = Just "NetworkError Error!"
+              }
+            , Cmd.none
+            )
+
+        LoadPhotos (Err (Http.BadStatus _)) ->
+            ( { model
+                | loadingError = Just "BadStatus Error!"
+              }
+            , Cmd.none
+            )
+
+        LoadPhotos (Err (Http.BadPayload str _)) ->
+            ( { model
+                | loadingError = Just ("BadPayload Error! " ++ str)
               }
             , Cmd.none
             )
@@ -174,9 +199,17 @@ update msg model =
 
 initialCmd : Cmd Msg
 initialCmd =
-    "http://elm-in-action.com/photos/list"
-        |> Http.getString
+    list photoDecoder
+        |> Http.get "http://elm-in-action.com/photos/list.json"
         |> Http.send LoadPhotos
+
+
+photoDecoder : Decoder Photo
+photoDecoder =
+    map2
+        Photo
+        (field "url" string)
+        (field "size" int)
 
 
 main : Program () Model Msg
