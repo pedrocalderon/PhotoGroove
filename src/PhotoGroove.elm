@@ -5,6 +5,7 @@ import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
+import Http
 import Random
 
 
@@ -24,6 +25,7 @@ type Msg
     | ClickedSize ThumbnailSize
     | ClickedSurpriseMe
     | GotSelectedIndex Int
+    | LoadPhotos (Result Http.Error String)
 
 
 view : Model -> Html Msg
@@ -134,12 +136,37 @@ update msg model =
             in
             ( { model | selectedUrl = newSelectedUrl }, Cmd.none )
 
+        LoadPhotos (Ok responseStr) ->
+            let
+                urls =
+                    String.split "," responseStr
+
+                photos =
+                    List.map Photo urls
+            in
+            ( { model
+                | photos = photos
+                , selectedUrl = List.head urls
+              }
+            , Cmd.none
+            )
+
+        LoadPhotos (Err _) ->
+            ( model, Cmd.none )
+
+
+initialCmd : Cmd Msg
+initialCmd =
+    "http://elm-in-action.com/photos/list"
+        |> Http.getString
+        |> Http.send LoadPhotos
+
 
 main : Program () Model Msg
 main =
     Browser.element
-        { init = \flags -> ( initialModel, Cmd.none )
+        { init = \flags -> ( initialModel, initialCmd )
         , view = view
         , update = update
-        , subscriptions = \model -> Sub.none
+        , subscriptions = \_ -> Sub.none
         }
