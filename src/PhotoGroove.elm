@@ -1,4 +1,4 @@
-module PhotoGroove exposing (main)
+port module PhotoGroove exposing (main)
 
 import Array exposing (Array)
 import Browser
@@ -84,7 +84,7 @@ viewLarge maybeUrl =
             text ""
 
         Just url ->
-            img [ class "large", src (urlPrefix ++ "large/" ++ url) ] []
+            canvas [ id "main-canvas", class "large" ] []
 
 
 viewThumbnail : Maybe String -> Photo -> Html Msg
@@ -119,6 +119,15 @@ sizeToString size =
             "large"
 
 
+port setFilters : FilterOptions -> Cmd msg
+
+
+type alias FilterOptions =
+    { url : String
+    , filters : List { name : String, amount : Float }
+    }
+
+
 type alias Photo =
     { url : String
     , size : Int
@@ -148,23 +157,32 @@ initialModel =
     }
 
 
+applyFilters : Model -> ( Model, Cmd Msg )
+applyFilters model =
+    case model.selectedUrl of
+        Just selectedUrl ->
+            let
+                filters =
+                    [ { name = "Hue", amount = toFloat model.hue / 11 }
+                    , { name = "Ripple", amount = toFloat model.ripple / 11 }
+                    , { name = "Noise", amount = toFloat model.noise / 11 }
+                    ]
+
+                url =
+                    urlPrefix ++ "large/" ++ selectedUrl
+
+                cmd =
+                    setFilters { url = url, filters = filters }
+            in
+            ( model, cmd )
+
+        Nothing ->
+            ( model, Cmd.none )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        ClickedPhoto url ->
-            ( { model | selectedUrl = Just url }, Cmd.none )
-
-        ClickedSize size ->
-            ( { model | chosenSize = size }, Cmd.none )
-
-        ClickedSurpriseMe ->
-            let
-                randomPhotoPicker : Random.Generator Int
-                randomPhotoPicker =
-                    Random.int 0 (List.length model.photos - 1)
-            in
-            ( model, Random.generate GotSelectedIndex randomPhotoPicker )
-
         GotSelectedIndex index ->
             let
                 newSelectedUrl : Maybe String
@@ -174,15 +192,28 @@ update msg model =
                         |> Array.get index
                         |> Maybe.map .url
             in
-            ( { model | selectedUrl = newSelectedUrl }, Cmd.none )
+            applyFilters { model | selectedUrl = newSelectedUrl }
+
+        ClickedPhoto selectedUrl ->
+            applyFilters { model | selectedUrl = Just selectedUrl }
+
+        ClickedSurpriseMe ->
+            let
+                randomPhotoPicker : Random.Generator Int
+                randomPhotoPicker =
+                    Random.int 0 (List.length model.photos - 1)
+            in
+            ( model, Random.generate GotSelectedIndex randomPhotoPicker )
+
+        ClickedSize size ->
+            ( { model | chosenSize = size }, Cmd.none )
 
         LoadPhotos (Ok photos) ->
-            ( { model
-                | photos = photos
-                , selectedUrl = Maybe.map .url (List.head photos)
-              }
-            , Cmd.none
-            )
+            applyFilters
+                { model
+                    | photos = photos
+                    , selectedUrl = Maybe.map .url (List.head photos)
+                }
 
         LoadPhotos (Err (Http.BadUrl urlErr)) ->
             ( { model
@@ -220,19 +251,13 @@ update msg model =
             )
 
         SetHue hue ->
-            ( { model | hue = hue }
-            , Cmd.none
-            )
+            applyFilters { model | hue = hue }
 
         SetRipple ripple ->
-            ( { model | ripple = ripple }
-            , Cmd.none
-            )
+            applyFilters { model | ripple = ripple }
 
         SetNoise noise ->
-            ( { model | noise = noise }
-            , Cmd.none
-            )
+            applyFilters { model | noise = noise }
 
 
 initialCmd : Cmd Msg
