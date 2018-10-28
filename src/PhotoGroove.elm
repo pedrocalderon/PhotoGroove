@@ -3,10 +3,10 @@ module PhotoGroove exposing (main)
 import Array exposing (Array)
 import Browser
 import Html exposing (..)
-import Html.Attributes exposing (class, classList, id, name, src, title, type_)
-import Html.Events exposing (onClick)
+import Html.Attributes exposing (class, classList, id, max, name, src, title, type_)
+import Html.Events exposing (on, onClick)
 import Http
-import Json.Decode exposing (Decoder, field, int, list, map2, string)
+import Json.Decode exposing (Decoder, at, field, int, list, map2, string)
 import Random
 
 
@@ -27,6 +27,9 @@ type Msg
     | ClickedSurpriseMe
     | GotSelectedIndex Int
     | LoadPhotos (Result Http.Error (List Photo))
+    | SetHue Int
+    | SetRipple Int
+    | SetNoise Int
 
 
 viewOnError : Model -> Html Msg
@@ -49,6 +52,11 @@ view model =
         , button
             [ onClick ClickedSurpriseMe ]
             [ text "Surprise Me!" ]
+        , div [ class "filters" ]
+            [ viewFilter "Hue" SetHue model.hue
+            , viewFilter "Ripple" SetRipple model.ripple
+            , viewFilter "Noise" SetNoise model.noise
+            ]
         , h3 [] [ text "Thumbnail Size:" ]
         , div [ id "choose-size" ]
             (List.map viewSizeChooser [ Small, Medium, Large ])
@@ -57,6 +65,15 @@ view model =
                 model.photos
             )
         , viewLarge model.selectedUrl
+        ]
+
+
+viewFilter : String -> (Int -> Msg) -> Int -> Html Msg
+viewFilter name toMsg magnitude =
+    div [ class "filter-slider" ]
+        [ label [] [ text name ]
+        , paperSlider [ max "11", onImmediateValueChange toMsg ] []
+        , label [] [ text (String.fromInt magnitude) ]
         ]
 
 
@@ -113,6 +130,9 @@ type alias Model =
     , selectedUrl : Maybe String
     , loadingError : Maybe String
     , chosenSize : ThumbnailSize
+    , hue : Int
+    , ripple : Int
+    , noise : Int
     }
 
 
@@ -122,6 +142,9 @@ initialModel =
     , selectedUrl = Nothing
     , loadingError = Nothing
     , chosenSize = Medium
+    , hue = 0
+    , ripple = 0
+    , noise = 0
     }
 
 
@@ -196,6 +219,21 @@ update msg model =
             , Cmd.none
             )
 
+        SetHue hue ->
+            ( { model | hue = hue }
+            , Cmd.none
+            )
+
+        SetRipple ripple ->
+            ( { model | ripple = ripple }
+            , Cmd.none
+            )
+
+        SetNoise noise ->
+            ( { model | noise = noise }
+            , Cmd.none
+            )
+
 
 initialCmd : Cmd Msg
 initialCmd =
@@ -220,3 +258,15 @@ main =
         , update = update
         , subscriptions = \_ -> Sub.none
         }
+
+
+paperSlider : List (Attribute msg) -> List (Html msg) -> Html msg
+paperSlider =
+    node "paper-slider"
+
+
+onImmediateValueChange : (Int -> msg) -> Attribute msg
+onImmediateValueChange toMsg =
+    at [ "target", "immediateValue" ] int
+        |> Json.Decode.map toMsg
+        |> on "immediate-value-changed"
