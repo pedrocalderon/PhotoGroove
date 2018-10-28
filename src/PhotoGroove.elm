@@ -26,6 +26,7 @@ type Msg
     | ClickedSize ThumbnailSize
     | ClickedSurpriseMe
     | GotSelectedIndex Int
+    | SetStatus String
     | LoadPhotos (Result Http.Error (List Photo))
     | SetHue Int
     | SetRipple Int
@@ -52,6 +53,7 @@ view model =
         , button
             [ onClick ClickedSurpriseMe ]
             [ text "Surprise Me!" ]
+        , div [ class "status" ] [ text model.status ]
         , div [ class "filters" ]
             [ viewFilter "Hue" SetHue model.hue
             , viewFilter "Ripple" SetRipple model.ripple
@@ -122,6 +124,9 @@ sizeToString size =
 port setFilters : FilterOptions -> Cmd msg
 
 
+port statusChanges : (String -> msg) -> Sub msg
+
+
 type alias FilterOptions =
     { url : String
     , filters : List { name : String, amount : Float }
@@ -136,6 +141,7 @@ type alias Photo =
 
 type alias Model =
     { photos : List Photo
+    , status : String
     , selectedUrl : Maybe String
     , loadingError : Maybe String
     , chosenSize : ThumbnailSize
@@ -148,6 +154,7 @@ type alias Model =
 initialModel : Model
 initialModel =
     { photos = []
+    , status = ""
     , selectedUrl = Nothing
     , loadingError = Nothing
     , chosenSize = Medium
@@ -183,6 +190,9 @@ applyFilters model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        SetStatus status ->
+            ( { model | status = status }, Cmd.none )
+
         GotSelectedIndex index ->
             let
                 newSelectedUrl : Maybe String
@@ -275,14 +285,23 @@ photoDecoder =
         (field "size" int)
 
 
-main : Program () Model Msg
+main : Program Float Model Msg
 main =
     Browser.element
-        { init = \flags -> ( initialModel, initialCmd )
+        { init = init
         , view = viewOnError
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = \_ -> statusChanges SetStatus
         }
+
+
+init : Float -> ( Model, Cmd Msg )
+init flags =
+    let
+        status =
+            "Initializing Pasta v" ++ String.fromFloat flags
+    in
+    ( { initialModel | status = status }, initialCmd )
 
 
 paperSlider : List (Attribute msg) -> List (Html msg) -> Html msg
