@@ -1,4 +1,4 @@
-port module PhotoGroove exposing (main)
+port module PhotoGroove exposing (FilterOptions, Model, Msg(..), Photo, ThumbnailSize(..), applyFilters, buildPhoto, init, initialCmd, initialModel, main, onImmediateValueChange, paperSlider, photoDecoder, setFilters, sizeToString, statusChanges, update, urlPrefix, view, viewFilter, viewLarge, viewOnError, viewSizeChooser, viewThumbnail)
 
 import Array exposing (Array)
 import Browser
