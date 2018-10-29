@@ -6,7 +6,8 @@ import Html exposing (..)
 import Html.Attributes exposing (class, classList, id, max, name, src, title, type_)
 import Html.Events exposing (on, onClick)
 import Http
-import Json.Decode exposing (Decoder, at, field, int, list, map2, string)
+import Json.Decode as Decode exposing (Decoder, at, field, int, list, map2, string)
+import Json.Decode.Pipeline exposing (optional, required)
 import Random
 
 
@@ -93,7 +94,7 @@ viewThumbnail : Maybe String -> Photo -> Html Msg
 viewThumbnail selectedUrl thumbnail =
     img
         [ src (urlPrefix ++ thumbnail.url)
-        , title (" [" ++ String.fromInt thumbnail.size ++ " KB]")
+        , title (thumbnail.title ++ " [" ++ String.fromInt thumbnail.size ++ " KB]")
         , classList [ ( "selected", selectedUrl == Just thumbnail.url ) ]
         , onClick (ClickedPhoto thumbnail.url)
         ]
@@ -136,6 +137,7 @@ type alias FilterOptions =
 type alias Photo =
     { url : String
     , size : Int
+    , title : String
     }
 
 
@@ -279,10 +281,15 @@ initialCmd =
 
 photoDecoder : Decoder Photo
 photoDecoder =
-    map2
-        Photo
-        (field "url" string)
-        (field "size" int)
+    Decode.succeed buildPhoto
+        |> required "url" string
+        |> required "size" int
+        |> optional "title" string "(untitled)"
+
+
+buildPhoto : String -> Int -> String -> Photo
+buildPhoto url size title =
+    { url = url, size = size, title = title }
 
 
 main : Program Float Model Msg
@@ -312,5 +319,5 @@ paperSlider =
 onImmediateValueChange : (Int -> msg) -> Attribute msg
 onImmediateValueChange toMsg =
     at [ "target", "immediateValue" ] int
-        |> Json.Decode.map toMsg
+        |> Decode.map toMsg
         |> on "immediate-value-changed"
